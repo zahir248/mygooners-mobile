@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../services/auth_service.dart';
+import '../config/api_config.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -24,6 +26,11 @@ class _RegisterPageState extends State<RegisterPage> {
   Map<String, List<String>>? _fieldErrors;
 
   final AuthService _authService = AuthService();
+  // Configure Google Sign-In with Web Client ID for server-side token verification
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email', 'profile'],
+    serverClientId: ApiConfig.googleWebClientId,
+  );
 
   @override
   void dispose() {
@@ -106,12 +113,54 @@ class _RegisterPageState extends State<RegisterPage> {
     });
 
     try {
-      final result = await _authService.loginWithGoogle();
+      // Check if user is already signed in, if so sign out to force account picker
+      final currentUser = await _googleSignIn.signInSilently();
+      if (currentUser != null) {
+        await _googleSignIn.signOut();
+      }
+      
+      // Sign in with Google (this will show account picker)
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      
+      if (googleUser == null) {
+        // User cancelled the sign-in
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // Get authentication details
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+
+      // Validate that we have required fields
+      if (googleUser.id.isEmpty || googleUser.email.isEmpty) {
+        setState(() {
+          _errorMessage = 'Maklumat Google tidak lengkap. Sila cuba lagi.';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // Send user info to backend
+      final result = await _authService.loginWithGoogle(
+        googleId: googleUser.id,
+        email: googleUser.email,
+        name: googleUser.displayName ?? googleUser.email.split('@')[0],
+        photoUrl: googleUser.photoUrl,
+      );
 
       if (result['success']) {
         final prefs = await SharedPreferences.getInstance();
         if (result['token'] != null) {
           await prefs.setString('auth_token', result['token']);
+        }
+        
+        // Save user info
+        if (result['user'] != null) {
+          final user = result['user'] as Map<String, dynamic>;
+          await prefs.setString('user_name', user['name'] ?? '');
+          await prefs.setString('user_email', user['email'] ?? '');
         }
 
         if (mounted) {
@@ -125,19 +174,47 @@ class _RegisterPageState extends State<RegisterPage> {
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Ralat berlaku semasa log masuk dengan Google.';
+        _errorMessage = 'Ralat berlaku semasa log masuk dengan Google: ${e.toString()}';
         _isLoading = false;
       });
     }
   }
 
   Widget _buildGoogleIcon() {
-    return SizedBox(
+    return Image.network(
+      'https://www.gstatic.com/images/branding/product/1x/googleg_48dp.png',
       width: 24,
       height: 24,
-      child: CustomPaint(
-        painter: _GoogleIconPainter(),
-      ),
+      fit: BoxFit.contain,
+      errorBuilder: (context, error, stackTrace) {
+        // Fallback to a simple colored circle with "G" if image fails to load
+        return Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFF4285F4), // Blue
+                Color(0xFFEA4335), // Red
+                Color(0xFFFBBC05), // Yellow
+                Color(0xFF34A853), // Green
+              ],
+              stops: [0.0, 0.33, 0.66, 1.0],
+            ),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Center(
+            child: Text(
+              'G',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -903,82 +980,4 @@ class _PrivacyModal extends StatelessWidget {
       ),
     );
   }
-}
-
-// Google Icon Painter - Simplified Google "G" logo
-class _GoogleIconPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..style = PaintingStyle.fill;
-    final centerX = size.width / 2;
-    final centerY = size.height / 2;
-    final radius = size.width / 2;
-    
-    // Draw Google "G" using paths
-    // Blue section (top-left)
-    paint.color = const Color(0xFF4285F4);
-    final bluePath = Path()
-      ..moveTo(centerX, centerY - radius * 0.3)
-      ..arcTo(
-        Rect.fromCircle(center: Offset(centerX, centerY), radius: radius * 0.7),
-        -1.57, // -90 degrees
-        1.57, // 90 degrees
-        false,
-      )
-      ..lineTo(centerX - radius * 0.3, centerY)
-      ..lineTo(centerX, centerY);
-    canvas.drawPath(bluePath, paint);
-    
-    // Red section (top-right)
-    paint.color = const Color(0xFFEA4335);
-    final redPath = Path()
-      ..moveTo(centerX, centerY - radius * 0.3)
-      ..lineTo(centerX + radius * 0.7, centerY - radius * 0.3)
-      ..lineTo(centerX + radius * 0.7, centerY)
-      ..lineTo(centerX, centerY);
-    canvas.drawPath(redPath, paint);
-    
-    // Yellow section (bottom-left)
-    paint.color = const Color(0xFFFBBC05);
-    final yellowPath = Path()
-      ..moveTo(centerX - radius * 0.3, centerY)
-      ..arcTo(
-        Rect.fromCircle(center: Offset(centerX, centerY), radius: radius * 0.7),
-        1.57, // 90 degrees
-        1.57, // 90 degrees
-        false,
-      )
-      ..lineTo(centerX, centerY);
-    canvas.drawPath(yellowPath, paint);
-    
-    // Green section (bottom-right)
-    paint.color = const Color(0xFF34A853);
-    final greenPath = Path()
-      ..moveTo(centerX, centerY)
-      ..lineTo(centerX + radius * 0.7, centerY)
-      ..lineTo(centerX + radius * 0.7, centerY + radius * 0.7)
-      ..arcTo(
-        Rect.fromCircle(center: Offset(centerX, centerY), radius: radius * 0.7),
-        0, // 0 degrees
-        -1.57, // -90 degrees
-        false,
-      )
-      ..lineTo(centerX, centerY);
-    canvas.drawPath(greenPath, paint);
-    
-    // White cutout for "G" shape
-    paint.color = Colors.white;
-    canvas.drawCircle(Offset(centerX, centerY), radius * 0.4, paint);
-    
-    // Draw the horizontal bar of "G"
-    paint.color = Colors.white;
-    final barRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(centerX, centerY - radius * 0.15, radius * 0.35, radius * 0.3),
-      const Radius.circular(2),
-    );
-    canvas.drawRRect(barRect, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

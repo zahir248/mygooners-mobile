@@ -39,18 +39,44 @@ class AuthService {
     }
   }
 
-  Future<Map<String, dynamic>> loginWithGoogle() async {
+  Future<Map<String, dynamic>> loginWithGoogle({
+    required String googleId,
+    required String email,
+    required String name,
+    String? photoUrl,
+  }) async {
     try {
-      // This will be implemented when you integrate Google Sign-In
-      // For now, it's a placeholder
-      final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/auth/google'),
+      final response = await http.post(
+        Uri.parse(ApiConfig.getUrl(ApiConfig.loginGoogle)),
         headers: {
+          'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
+        body: jsonEncode({
+          'google_id': googleId,
+          'email': email,
+          'name': name,
+          'photo_url': photoUrl,
+        }),
       );
 
-      final data = jsonDecode(response.body);
+      // Check if response body is empty or not valid JSON
+      if (response.body.isEmpty) {
+        return {
+          'success': false,
+          'message': 'Tiada respons dari pelayan. Sila cuba lagi.',
+        };
+      }
+
+      Map<String, dynamic> data;
+      try {
+        data = jsonDecode(response.body) as Map<String, dynamic>;
+      } catch (e) {
+        return {
+          'success': false,
+          'message': 'Respons tidak sah dari pelayan: ${response.body}',
+        };
+      }
 
       if (response.statusCode == 200) {
         return {
@@ -61,13 +87,13 @@ class AuthService {
       } else {
         return {
           'success': false,
-          'message': data['message'] ?? 'Log masuk Google gagal.',
+          'message': data['message'] ?? 'Log masuk Google gagal. Kod: ${response.statusCode}',
         };
       }
     } catch (e) {
       return {
         'success': false,
-        'message': 'Ralat berlaku semasa log masuk dengan Google.',
+        'message': 'Ralat berlaku semasa log masuk dengan Google: ${e.toString()}',
       };
     }
   }

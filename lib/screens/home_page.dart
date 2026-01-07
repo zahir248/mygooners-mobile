@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../services/auth_service.dart';
+import '../config/api_config.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -13,6 +15,10 @@ class _HomePageState extends State<HomePage> {
   String? _userName;
   String? _userEmail;
   bool _isLoading = true;
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email', 'profile'],
+    serverClientId: ApiConfig.googleWebClientId,
+  );
 
   @override
   void initState() {
@@ -32,6 +38,13 @@ class _HomePageState extends State<HomePage> {
   Future<void> _handleLogout() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
+    
+    // Sign out from Google Sign-In first
+    try {
+      await _googleSignIn.signOut();
+    } catch (e) {
+      // Ignore errors if not signed in with Google
+    }
     
     if (token != null) {
       final authService = AuthService();

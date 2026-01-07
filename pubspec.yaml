@@ -40,6 +40,9 @@ dependencies:
   
   # Shared preferences for storing user data
   shared_preferences: ^2.2.2
+  
+  # Google Sign-In for authentication
+  google_sign_in: ^6.2.1
 
 dev_dependencies:
   flutter_test:
