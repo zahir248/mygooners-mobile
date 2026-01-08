@@ -17,7 +17,7 @@ class _HomePageState extends State<HomePage> {
   bool _isLoading = true;
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'profile'],
-    serverClientId: ApiConfig.googleWebClientId,
+    serverClientId: ApiConfig.googleAndroidClientId,
   );
 
   @override

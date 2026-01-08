@@ -11,9 +11,6 @@ class ApiConfig {
   static const String baseUrl = 'http://192.168.0.165:8000/api';
   
   // Google OAuth Configuration
-  // Web Client ID: Used for server-side token verification (from Laravel config)
-  static const String googleWebClientId = '945050509185-cptos9ssc86tm0a0e28ko7la6je9uakc.apps.googleusercontent.com';
-  
   // Android Client ID: Configured in Google Cloud Console
   // Package name: com.example.mygooners
   // SHA-1: Must be added in Google Cloud Console

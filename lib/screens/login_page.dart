@@ -22,10 +22,10 @@ class _LoginPageState extends State<LoginPage> {
   bool _hasToken = false;
 
   final AuthService _authService = AuthService();
-  // Configure Google Sign-In with Web Client ID for server-side token verification
+  // Configure Google Sign-In with Android Client ID
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'profile'],
-    serverClientId: ApiConfig.googleWebClientId,
+    serverClientId: ApiConfig.googleAndroidClientId,
   );
 
   @override
